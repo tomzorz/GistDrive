@@ -23,12 +23,12 @@ public sealed class EngineHarness : IAsyncDisposable
     private readonly ConcurrentQueue<string> _opened = new();
     private readonly Config _config;
 
-    public EngineHarness(double undoSeconds = 0, double secretDelaySeconds = 0, DeletionSetting deletion = DeletionSetting.Off, double retrySeconds = 0.5)
+    public EngineHarness(double undoSeconds = 0, DeletionSetting deletion = DeletionSetting.Off, double retrySeconds = 0.5)
     {
         Folders = new Folders(Path.Combine(_temp.Path, "GistDrive"));
         Outside = Path.Combine(_temp.Path, "outside");
         Directory.CreateDirectory(Outside);
-        _config = new Config(Folders.Root, undoSeconds, secretDelaySeconds, deletion, retrySeconds / 60);
+        _config = new Config(Folders.Root, undoSeconds, deletion, retrySeconds / 60);
         Engine = NewEngine();
     }
 
@@ -41,9 +41,9 @@ public sealed class EngineHarness : IAsyncDisposable
     public Engine Engine { get; private set; }
 
     /// <summary>
-    /// The record of cancelled uploads, next to the root folder as cancelled.json sits next to the exe.
+    /// The record of held files, next to the root folder as held.json sits next to the exe.
     /// </summary>
-    public string CancelledRecord => Path.Combine(_temp.Path, CancelledUploads.FileName);
+    public string HeldRecord => Path.Combine(_temp.Path, HeldFiles.FileName);
 
     /// <summary>
     /// A folder next to the root folder, for originals of Send To and for moving things out.
@@ -86,7 +86,7 @@ public sealed class EngineHarness : IAsyncDisposable
         _temp.Dispose();
     }
 
-    private Engine NewEngine() => new(_config, Folders, Fast, Api, Notifier, CancelledUploads.Load(CancelledRecord), path =>
+    private Engine NewEngine() => new(_config, Folders, Fast, Api, Notifier, HeldFiles.Load(HeldRecord), path =>
     {
         _opened.Enqueue(path);
         return Task.CompletedTask;

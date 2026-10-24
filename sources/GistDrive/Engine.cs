@@ -1,4 +1,3 @@
-using System.Security.Cryptography;
 using System.Threading.Channels;
 
 namespace GistDrive;
@@ -17,7 +16,7 @@ public sealed record Timings(
     TimeSpan OwnChangeQuiet)
 {
     /// <summary>
-    /// Settle per OPEN-8, refresh per REQ-MIR-2, and a deletion batch short enough that a
+    /// Settle per REQ-UP-14, refresh per REQ-MIR-2, and a deletion batch short enough that a
     /// deleted shortcut comes back within the 2 seconds of REQ-DEL-5.
     /// </summary>
     public static Timings Production { get; } = new(
@@ -53,7 +52,7 @@ public sealed partial class Engine : IAsyncDisposable
     private readonly Timings _timings;
     private readonly IGistApi _api;
     private readonly INotifier _notifier;
-    private readonly CancelledUploads _cancelled;
+    private readonly HeldFiles _held;
     private readonly Func<string, Task> _open;
     private readonly Channel<Work> _work = Channel.CreateUnbounded<Work>(new UnboundedChannelOptions { SingleReader = true });
     private readonly CancellationTokenSource _stop = new();
@@ -68,14 +67,14 @@ public sealed partial class Engine : IAsyncDisposable
     /// <summary>
     /// Creates the engine. The open callback shows a file in its default app; Edit uses it.
     /// </summary>
-    public Engine(Config config, Folders folders, Timings timings, IGistApi api, INotifier notifier, CancelledUploads cancelled, Func<string, Task> open)
+    public Engine(Config config, Folders folders, Timings timings, IGistApi api, INotifier notifier, HeldFiles held, Func<string, Task> open)
     {
         _config = config;
         _folders = folders;
         _timings = timings;
         _api = api;
         _notifier = notifier;
-        _cancelled = cancelled;
+        _held = held;
         _open = open;
         _notifier.CancelSelected += tag =>
         {
@@ -198,7 +197,7 @@ public sealed partial class Engine : IAsyncDisposable
     private async Task StartupAsync()
     {
         await RefreshAsync();
-        _cancelled.Prune();
+        _held.Prune();
         foreach (var top in _folders.TopFolders)
         {
             foreach (var file in Directory.EnumerateFiles(top)) OnChanged(file);
@@ -256,7 +255,7 @@ public sealed partial class Engine : IAsyncDisposable
     }
 
     // GistDrive announces each change it makes so that the watcher events the change causes are
-    // ignored (OPEN-8), and only those: the owner deleting a shortcut a moment after GistDrive
+    // ignored (REQ-UP-16), and only those: the owner deleting a shortcut a moment after GistDrive
     // wrote it is a real deletion. A write raises several events, so it stays expected for the
     // quiet period. A deletion or a move raises one event, which uses the expectation up.
     private void ExpectWrite(string path) => _expected[OwnWrite + path] = DateTimeOffset.UtcNow + _timings.OwnChangeQuiet;
@@ -312,12 +311,10 @@ public sealed partial class Engine : IAsyncDisposable
 
     private static bool IsUnder(string path, string folder) => path.StartsWith(folder + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase);
 
-    private static string Hash(string path) => Convert.ToHexString(SHA256.HashData(File.ReadAllBytes(path)));
-
     private static string DisplayName(string path) => Naming.IsShortcut(path) ? Naming.ShortcutName(path) : Path.GetFileName(path);
 
     /// <summary>
-    /// True when no other process has the file open, so a save has finished (OPEN-8).
+    /// True when no other process has the file open, so a save has finished (REQ-UP-14).
     /// </summary>
     private static bool IsFree(string path)
     {

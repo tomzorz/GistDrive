@@ -21,7 +21,7 @@ public sealed partial class Engine
         };
         if (key is not null && _pendingByKey.TryGetValue(key, out var id) && _pending.TryGetValue(id, out var existing))
         {
-            // Another save restarts the window, and the upload sends the latest content (REQ-UNDO-9, OPEN-10).
+            // Another save restarts the window, and the upload sends the latest content (REQ-UNDO-9, REQ-UNDO-22).
             existing.Plan = plan;
             existing.Window = window;
             existing.DueAt = DateTimeOffset.UtcNow + window;
@@ -35,7 +35,6 @@ public sealed partial class Engine
         if (key is not null) _pendingByKey[key] = pending.Id;
         if (window > TimeSpan.Zero)
         {
-            // OPEN-30: a secret upload delay above 0 seconds gets the same countdown.
             var (title, body) = Describe(plan);
             _notifier.ShowCountdown(pending.Tag, title, body, window, window);
             pending.Notified = true;
@@ -45,7 +44,8 @@ public sealed partial class Engine
         PostAfter(window, new PendingDue(pending.Id));
     }
 
-    private TimeSpan WindowFor(Visibility visibility) => visibility == Visibility.Public ? _config.UndoWindow : _config.SecretUploadDelay;
+    // Secret uploads go at once (REQ-UNDO-4); only public ones wait for the undo window.
+    private TimeSpan WindowFor(Visibility visibility) => visibility == Visibility.Public ? _config.UndoWindow : TimeSpan.Zero;
 
     private async Task OnPendingDueAsync(Guid id)
     {
@@ -81,12 +81,12 @@ public sealed partial class Engine
         Drop(pending);
         switch (pending.Plan)
         {
-            // OPEN-11: the file stays, and only a new save uploads it, also after a restart.
+            // REQ-UNDO-16, REQ-UNDO-23: the file stays, and only a new save uploads it, also after a restart.
             case UploadPlan { KeepLocal: false } upload when File.Exists(upload.LocalPath):
-                _cancelled.Add(upload.LocalPath, File.GetLastWriteTimeUtc(upload.LocalPath));
+                _held.Add(upload.LocalPath, File.GetLastWriteTimeUtc(upload.LocalPath));
                 break;
             case FolderPlan folder when Directory.Exists(folder.FolderPath):
-                _cancelled.Add(folder.FolderPath, FolderStamp(folder.FolderPath));
+                _held.Add(folder.FolderPath, FolderStamp(folder.FolderPath));
                 break;
             case DeletePlan { LocalGone: true } deletion:
                 foreach (var target in deletion.Targets) Recreate(target);
@@ -169,7 +169,7 @@ public sealed partial class Engine
             if (current.File(plan.GistFile) is { Truncated: false, Content: { } content } && content == text)
             {
                 // Nothing changed, as with a fresh Edit download (REQ-EDIT-5): the file stays where it is.
-                if (!plan.KeepLocal) _editCopies[plan.LocalPath] = Hash(plan.LocalPath);
+                if (!plan.KeepLocal) _held.Add(plan.LocalPath, File.GetLastWriteTimeUtc(plan.LocalPath));
                 return;
             }
 
@@ -181,8 +181,7 @@ public sealed partial class Engine
         // REQ-UP-8: the gist shortcut takes the place of the uploaded file.
         ExpectDelete(plan.LocalPath);
         File.Delete(plan.LocalPath);
-        _editCopies.Remove(plan.LocalPath);
-        _cancelled.Remove(plan.LocalPath);
+        _held.Remove(plan.LocalPath);
     }
 
     private async Task UploadFolderAsync(FolderPlan plan)
@@ -202,7 +201,7 @@ public sealed partial class Engine
             WriteShortcut(plan.FolderPath, new GistShortcut(gist.Id, file.Name, url));
         }
 
-        _cancelled.Remove(plan.FolderPath);
+        _held.Remove(plan.FolderPath);
     }
 
     private async Task DeleteAsync(DeletePlan plan)
@@ -225,12 +224,18 @@ public sealed partial class Engine
 
     private async Task MakePublicAsync(MakePublicPlan plan)
     {
+        // Send To makes single-file gists only, so a gist folder never has a source path.
+        var source = plan.IsFolder ? null : _index.Get(plan.LocalPath)?.SourcePath;
         var secret = await _api.GetAsync(plan.GistId, _stop.Token);
         if (secret.IsPublic) return;
         if (secret.Files.Any(f => f.Truncated || f.Content is null)) throw new NotUploadableException("a file in the gist is larger than the 1 MB GitHub returns through its API");
 
         // REQ-PUB-4, REQ-PUB-5: a public copy first, then the secret gist goes.
-        await _api.CreateAsync(true, secret.Description, secret.Files.ToDictionary(f => f.Name, f => f.Content!), _stop.Token);
+        var copy = await _api.CreateAsync(true, secret.Description, secret.Files.ToDictionary(f => f.Name, f => f.Content!), _stop.Token);
+
+        // REQ-PUB-6: the public shortcut keeps the source path, so the next send of the same
+        // original updates the public copy. The refresh keeps a source it finds on a shortcut.
+        if (source is not null && copy.Files is [var file]) WriteShortcut(_folders.Public, new GistShortcut(copy.Id, file.Name, copy.HtmlUrl, source));
         try
         {
             await _api.DeleteAsync(secret.Id, _stop.Token);
@@ -242,13 +247,12 @@ public sealed partial class Engine
             return;
         }
 
-        // ceiling: a Send To source path does not carry over to the public copy.
         ForgetLocal(new DeleteTarget(secret.Id, null, plan.LocalPath, plan.IsFolder));
     }
 
     /// <summary>
     /// After a failure that retries cannot fix: an upload's file goes to the failed folder
-    /// (REQ-FAIL-3, REQ-FAIL-4), anything else gets a notification (OPEN-19).
+    /// (REQ-FAIL-3, REQ-FAIL-4), anything else gets a notification (REQ-FAIL-8).
     /// </summary>
     private void GiveUp(Plan plan, Exception ex)
     {
@@ -278,7 +282,7 @@ public sealed partial class Engine
 
     /// <summary>
     /// Moves a file or folder that cannot be uploaded into the failed folder of its top folder
-    /// and writes the reason file next to it (REQ-FAIL-5, OPEN-15).
+    /// and writes the reason file next to it (REQ-FAIL-5, REQ-FAIL-12).
     /// </summary>
     private void MoveToFailed(string path, Visibility visibility, string reason)
     {

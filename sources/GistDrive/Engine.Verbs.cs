@@ -71,7 +71,9 @@ public sealed partial class Engine
 
             ExpectWrite(target);
             await File.WriteAllTextAsync(target, content, new UTF8Encoding(encoderShouldEmitUTF8Identifier: false), _stop.Token);
-            _editCopies[target] = Hash(target);
+
+            // REQ-EDIT-6: the download stays quiet, across restarts too, until the owner saves it.
+            _held.Add(target, File.GetLastWriteTimeUtc(target));
         }
 
         await _open(target);
@@ -90,7 +92,7 @@ public sealed partial class Engine
 
     /// <summary>
     /// REQ-PUB-1 to REQ-PUB-5: works on a gist shortcut or gist folder directly in the secret
-    /// folder (OPEN-32).
+    /// folder (REQ-PUB-7).
     /// </summary>
     private void MakePublic(string path)
     {
@@ -118,7 +120,7 @@ public sealed partial class Engine
         {
             if (Directory.Exists(path))
             {
-                // OPEN-26: a sent folder behaves like a folder added to the top folder.
+                // REQ-SEND-10: a sent folder behaves like a folder added to the top folder.
                 CopyFolder(path, UniquePath(Path.Combine(top, Path.GetFileName(path))));
                 continue;
             }

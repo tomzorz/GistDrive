@@ -128,6 +128,9 @@ public sealed class FakeGistApiContractTests : GistApiContract
     protected override IGistApi Api { get; } = new FakeGistApi();
 }
 
+// The live suites share one collection, so they run one after another: this one creates and
+// deletes gists, which would change the gist list LiveReadOnlyTests counts.
+[Collection("Live GitHub")]
 public sealed class GhGistApiContractTests : GistApiContract
 {
     public GhGistApiContractTests() =>

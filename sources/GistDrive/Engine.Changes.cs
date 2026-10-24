@@ -6,10 +6,7 @@ namespace GistDrive;
 /// </summary>
 public sealed partial class Engine
 {
-    // Downloads from Edit, with the hash of what GistDrive wrote (REQ-EDIT-5).
-    private readonly Dictionary<string, string> _editCopies = new(StringComparer.OrdinalIgnoreCase);
-
-    // Deleted gist shortcuts and gist folders that wait for the batch window (OPEN-14).
+    // Deleted gist shortcuts and gist folders that wait for the batch window (REQ-UNDO-24).
     private readonly List<(string Path, bool ByVerb)> _deletions = [];
 
     private void OnChanged(string path)
@@ -56,8 +53,7 @@ public sealed partial class Engine
         }
 
         StopSettling(path);
-        _editCopies.Remove(path);
-        _cancelled.Remove(path);
+        _held.Remove(path);
         DropPendingUpload(path);
         var isGistShortcut = _index.Get(path) is not null;
         var isGistFolder = location.Place == Place.InTop && IsGistFolder(path);
@@ -70,7 +66,7 @@ public sealed partial class Engine
 
         if (_folders.Locate(oldPath).Place == Place.Failed)
         {
-            // A file that leaves a failed folder leaves its reason file behind (OPEN-18) and counts as new where it lands.
+            // A file that leaves a failed folder leaves its reason file behind (REQ-FAIL-11) and counts as new where it lands.
             RemoveReasonFile(oldPath);
             OnChanged(newPath);
             return;
@@ -91,7 +87,7 @@ public sealed partial class Engine
         // Anything else: an editor renaming its temporary file into place, or a new folder getting its name.
         StopSettling(oldPath);
         DropPendingUpload(oldPath);
-        _cancelled.Rename(oldPath, newPath);
+        _held.Rename(oldPath, newPath);
         OnChanged(newPath);
     }
 
@@ -114,8 +110,9 @@ public sealed partial class Engine
 
         var location = _folders.Locate(path);
         if (location.Place is not (Place.InTop or Place.InSubfolder)) return;
-        if (_editCopies.TryGetValue(path, out var copy) && copy == Hash(path)) return;
-        if (_cancelled.Holds(path, File.GetLastWriteTimeUtc(path))) return;
+
+        // A cancelled upload or an Edit download waits for a save (REQ-UNDO-17).
+        if (_held.Holds(path, File.GetLastWriteTimeUtc(path))) return;
 
         var read = TextFile.Read(path);
         if (read.Text?.Length == 0) return; // An empty file is still being written; wait for content.
@@ -147,7 +144,7 @@ public sealed partial class Engine
             return;
         }
 
-        if (_cancelled.Holds(folder, FolderStamp(folder))) return;
+        if (_held.Holds(folder, FolderStamp(folder))) return;
 
         try
         {
@@ -155,7 +152,7 @@ public sealed partial class Engine
         }
         catch (NotUploadableException ex)
         {
-            // OPEN-21: a folder that cannot become a gist goes to the failed folder whole.
+            // REQ-UP-21: a folder that cannot become a gist goes to the failed folder whole.
             MoveToFailed(folder, location.Visibility, $"GistDrive did not upload the folder {Path.GetFileName(folder)} because {ex.Message}.");
             return;
         }
@@ -168,7 +165,7 @@ public sealed partial class Engine
         var name = Naming.ShortcutName(oldPath);
         if (!SamePath(Path.GetDirectoryName(oldPath), Path.GetDirectoryName(newPath)) || !Naming.IsShortcut(newPath))
         {
-            // OPEN-22: gist shortcuts stay where the mirror puts them.
+            // REQ-PUB-8: gist shortcuts stay where the mirror puts them.
             PutBackWithNotice(newPath, oldPath);
             return;
         }
@@ -191,7 +188,7 @@ public sealed partial class Engine
         }
         catch (GistApiException ex)
         {
-            // OPEN-19: the old name comes back, with the reason.
+            // REQ-FAIL-7: the old name comes back, with the reason.
             PutBack(newPath, oldPath);
             _notifier.ShowMessage("Rename failed", $"{name} keeps its name: {ex.Explanation}.");
         }
@@ -236,7 +233,7 @@ public sealed partial class Engine
         _deletions.Clear();
 
         // The watcher reports a move between folders as a deletion and a creation. A deleted gist
-        // shortcut or gist folder that turned up elsewhere in the mirror was moved: it goes back (OPEN-22).
+        // shortcut or gist folder that turned up elsewhere in the mirror was moved: it goes back (REQ-PUB-8).
         var moved = batch.Where(d => !d.ByVerb && PutBackMoved(d.Path)).ToList();
         foreach (var group in batch.Except(moved).GroupBy(d => d.ByVerb))
         {

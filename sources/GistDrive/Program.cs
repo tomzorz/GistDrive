@@ -58,8 +58,8 @@ public static class Program
         folders.EnsureTopFolders();
         FolderIcons.Apply(folders, FolderIcons.Beside(exe));
         var notifier = new WindowsNotifier(AppId, Installer.DisplayName, Installer.NotificationImage(exe));
-        var cancelled = CancelledUploads.Load(Path.Combine(home, CancelledUploads.FileName));
-        await using var engine = new Engine(config, folders, Timings.Production, new GhGistApi(), notifier, cancelled, OpenWithDefaultApp);
+        var held = HeldFiles.Load(Path.Combine(home, HeldFiles.FileName));
+        await using var engine = new Engine(config, folders, Timings.Production, new GhGistApi(), notifier, held, OpenWithDefaultApp);
         engine.Start();
         Log.Info($"running on {folders.Root}");
 

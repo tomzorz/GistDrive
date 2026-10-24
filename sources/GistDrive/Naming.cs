@@ -28,7 +28,7 @@ public static class Naming
     };
 
     /// <summary>
-    /// Makes a name safe for Windows (OPEN-23): each forbidden or control character becomes
+    /// Makes a name safe for Windows (REQ-LAY-16): each forbidden or control character becomes
     /// "_", trailing dots and spaces go, and a reserved device name gets a leading "_".
     /// </summary>
     public static string Sanitize(string name)
@@ -64,7 +64,7 @@ public static class Naming
     public static string WithFolderShortId(string name, string gistId) => $"{name} ({ShortId(gistId)})";
 
     /// <summary>
-    /// Removes the short gist ID that WithShortId inserted (OPEN-25). Other parentheses, like
+    /// Removes the short gist ID that WithShortId inserted (REQ-REN-3). Other parentheses, like
     /// the " (2)" of a copy, stay.
     /// </summary>
     public static string WithoutShortId(string name, string gistId)
@@ -98,7 +98,7 @@ public static class Naming
 
     /// <summary>
     /// The files that editors, Office and the shell write next to the real file while saving,
-    /// plus GistDrive's own reason files. GistDrive never uploads them (OPEN-8).
+    /// plus GistDrive's own reason files. GistDrive never uploads them (REQ-UP-15).
     /// </summary>
     public static bool IsScratch(string fileName) =>
         fileName.StartsWith('~') || fileName.StartsWith(".~", StringComparison.Ordinal)

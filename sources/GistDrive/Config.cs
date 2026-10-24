@@ -29,25 +29,21 @@ public enum DeletionSetting
 public sealed record Config(
     string RootFolder,
     double UndoWindowSeconds,
-    double SecretUploadDelaySeconds,
     DeletionSetting DeletionSetting,
     double RetryPeriodMinutes)
 {
     private static readonly JsonSerializerOptions JsonOptions = new() { WriteIndented = true };
 
     /// <summary>
-    /// The defaults from DESIGN.md.
+    /// The defaults from docs/SPEC.md.
     /// </summary>
-    public static Config Default { get; } = new(@"%USERPROFILE%\GistDrive", 30, 0, DeletionSetting.Off, 5);
+    public static Config Default { get; } = new(@"%USERPROFILE%\GistDrive", 30, DeletionSetting.Off, 5);
 
     [JsonIgnore]
     public string ResolvedRootFolder => Path.GetFullPath(Environment.ExpandEnvironmentVariables(RootFolder));
 
     [JsonIgnore]
     public TimeSpan UndoWindow => TimeSpan.FromSeconds(Math.Max(0, UndoWindowSeconds));
-
-    [JsonIgnore]
-    public TimeSpan SecretUploadDelay => TimeSpan.FromSeconds(Math.Max(0, SecretUploadDelaySeconds));
 
     [JsonIgnore]
     public TimeSpan RetryPeriod => TimeSpan.FromMinutes(Math.Max(0, RetryPeriodMinutes));

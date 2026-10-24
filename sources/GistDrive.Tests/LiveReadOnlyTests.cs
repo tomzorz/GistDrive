@@ -5,6 +5,7 @@ namespace GistDrive.Tests;
 /// GISTDRIVE_LIVE_READONLY=1. They list and read gists and write nothing to GitHub; the mirror
 /// goes to a temporary folder.
 /// </summary>
+[Collection("Live GitHub")]
 public sealed class LiveReadOnlyTests
 {
     public LiveReadOnlyTests() =>
@@ -34,9 +35,9 @@ public sealed class LiveReadOnlyTests
         var folders = new Folders(Path.Combine(temp.Path, "GistDrive"));
         var api = new GhGistApi();
         var gists = await api.ListAsync(TestContext.Current.CancellationToken);
-        var config = new Config(folders.Root, 30, 0, DeletionSetting.Off, 5);
-        var cancelled = CancelledUploads.Load(Path.Combine(temp.Path, CancelledUploads.FileName));
-        await using var engine = new Engine(config, folders, EngineHarness.Fast, api, new FakeNotifier(), cancelled, _ => Task.CompletedTask);
+        var config = new Config(folders.Root, 30, DeletionSetting.Off, 5);
+        var held = HeldFiles.Load(Path.Combine(temp.Path, HeldFiles.FileName));
+        await using var engine = new Engine(config, folders, EngineHarness.Fast, api, new FakeNotifier(), held, _ => Task.CompletedTask);
         engine.Start();
 
         var expected = gists.Sum(g => g.Files.Count);

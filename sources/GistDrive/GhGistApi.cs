@@ -129,7 +129,7 @@ public sealed partial class GhGistApi : IGistApi
     }
 
     /// <summary>
-    /// Turns what gh printed on failure into a kind (OPEN-16): network and server errors and
+    /// Turns what gh printed on failure into a kind (REQ-FAIL-2): network and server errors and
     /// rate limits are transient, everything else needs the owner.
     /// </summary>
     internal static GistApiException Classify(IReadOnlyList<string> arguments, string stderr)

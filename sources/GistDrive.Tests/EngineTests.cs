@@ -404,6 +404,24 @@ public sealed class VerbTests
     }
 
     [Fact]
+    public async Task An_unchanged_edit_download_stays_quiet_after_a_restart()
+    {
+        await using var h = new EngineHarness(undoSeconds: 1.5);
+        await h.SeedAsync(true, string.Empty, ("notes.md", "v1"));
+        h.Start();
+        await Eventually.True(() => File.Exists(h.Public("notes.md.url")), "the shortcut appears");
+        h.Submit("edit", h.Public("notes.md.url"));
+        await Eventually.True(() => h.Opened.Contains(h.Public("notes.md")), "the download opens");
+
+        await h.RestartAsync();
+        await Eventually.Stays(() => h.Notifier.Countdowns.Count == 0 && File.Exists(h.Public("notes.md")), "no countdown for the untouched download", 1_500);
+
+        await File.WriteAllTextAsync(h.Public("notes.md"), "v2", EngineHarness.Token);
+        await Eventually.True(() => h.Notifier.Countdowns.Count == 1, "a save brings the countdown");
+        await Eventually.True(() => h.OnlyGist?.File("notes.md")?.Content == "v2", "and the change goes up");
+    }
+
+    [Fact]
     public async Task Make_public_replaces_the_secret_gist_with_a_public_copy()
     {
         await using var h = new EngineHarness(undoSeconds: 0.3);
@@ -414,6 +432,25 @@ public sealed class VerbTests
         h.Submit("make-public", h.Secret("notes.md.url"));
         await Eventually.True(() => h.OnlyGist is { IsPublic: true, Description: "desc" } gist && gist.Id != secret.Id, "only a public copy is left");
         await Eventually.True(() => File.Exists(h.Public("notes.md.url")) && !File.Exists(h.Secret("notes.md.url")), "the shortcut moves to Public");
+    }
+
+    [Fact]
+    public async Task Make_public_keeps_the_send_to_source()
+    {
+        await using var h = new EngineHarness(undoSeconds: 0.3);
+        h.Start();
+        var original = Path.Combine(h.Outside, "notes.md");
+        await File.WriteAllTextAsync(original, "v1", EngineHarness.Token);
+        h.Submit("send-secret", original);
+        await Eventually.True(() => EngineHarness.Shortcut(h.Secret("notes.md.url"))?.SourcePath == original, "the secret shortcut remembers the original");
+
+        h.Submit("make-public", h.Secret("notes.md.url"));
+        await Eventually.True(() => h.OnlyGist is { IsPublic: true } && EngineHarness.Shortcut(h.Public("notes.md.url"))?.SourcePath == original, "the public shortcut remembers it too");
+        await Eventually.Stays(() => EngineHarness.Shortcut(h.Public("notes.md.url"))?.SourcePath == original, "and a refresh keeps it", 1_000);
+
+        await File.WriteAllTextAsync(original, "v2", EngineHarness.Token);
+        h.Submit("send-public", original);
+        await Eventually.True(() => h.OnlyGist is { IsPublic: true } gist && gist.File("notes.md")?.Content == "v2", "sending the original again updates the public gist");
     }
 
     [Fact]

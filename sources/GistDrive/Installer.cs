@@ -18,7 +18,7 @@ public sealed record InstallTarget(string ClassesKey, string ExplorerKey, Guid S
 }
 
 /// <summary>
-/// Adds and removes the integration (OPEN-28): the sidebar entry (REQ-SHELL-2 to REQ-SHELL-4),
+/// Adds and removes the integration (REQ-INST-1): the sidebar entry (REQ-SHELL-2 to REQ-SHELL-4),
 /// the menu entries (REQ-SHELL-9 to REQ-SHELL-11), the Send To entries (REQ-SEND-1), the
 /// Startup shortcut and the notification app ID. Everything lives under HKCU or in the user's
 /// own shell folders, so no admin rights are needed.

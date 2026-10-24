@@ -83,7 +83,7 @@ public sealed class MirrorIndex
 public sealed record ChangeAnnouncer(Action<string> Write, Action<string> Delete, Action<string, string> Move);
 
 /// <summary>
-/// Makes the disk match a planned mirror (REQ-MIR-4, OPEN-9). It touches gist shortcuts and gist
+/// Makes the disk match a planned mirror (REQ-MIR-4 to REQ-MIR-8). It touches gist shortcuts and gist
 /// folders only: a file the owner put in a top folder is never moved or deleted by a refresh.
 /// </summary>
 public sealed class Reconciler(Folders folders, MirrorIndex index, ChangeAnnouncer announce)

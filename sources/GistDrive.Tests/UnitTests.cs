@@ -108,6 +108,32 @@ public sealed class TextFileTests : IDisposable
     [Fact]
     public void An_empty_file_is_empty_text() => Assert.Equal(string.Empty, TextFile.Read(Write([])).Text);
 
+    [Theory]
+    [InlineData(false)]
+    [InlineData(true)]
+    public void Utf16_with_a_byte_order_mark_passes_as_text(bool bigEndian)
+    {
+        var encoding = new UnicodeEncoding(bigEndian, byteOrderMark: true);
+        var path = Write([.. encoding.GetPreamble(), .. encoding.GetBytes("héllo ✓ 𝄞\r\n")]);
+        Assert.Equal("héllo ✓ 𝄞\r\n", TextFile.Read(path).Text);
+    }
+
+    [Fact]
+    public void Utf16_counts_its_size_as_utf8()
+    {
+        // 600,000 ASCII letters take 1.2 MB as UTF-16 but only 600 kB as UTF-8, which is what GitHub stores.
+        Assert.True(TextFile.Read(Write([.. Encoding.Unicode.GetPreamble(), .. Encoding.Unicode.GetBytes(new string('a', 600_000))])).IsText);
+
+        // 400,000 euro signs take 800 kB as UTF-16 and 1.2 MB as UTF-8.
+        Assert.Contains("1 MB", TextFile.Read(Write([.. Encoding.Unicode.GetPreamble(), .. Encoding.Unicode.GetBytes(new string('€', 400_000))])).Reason);
+    }
+
+    [Fact]
+    public void Broken_utf16_fails_the_check() => Assert.Contains("UTF-16", TextFile.Read(Write([0xFF, 0xFE, 0x00, 0xD8])).Reason);
+
+    [Fact]
+    public void Utf16_with_a_nul_character_fails_the_check() => Assert.Contains("NUL", TextFile.Read(Write([0xFF, 0xFE, 0x41, 0x00, 0x00, 0x00])).Reason);
+
     private string Write(byte[] bytes)
     {
         var path = Path.Combine(_temp.Path, Guid.NewGuid().ToString("N"));
@@ -202,22 +228,22 @@ public sealed class FolderIconsTests : IDisposable
     }
 }
 
-public sealed class CancelledUploadsTests : IDisposable
+public sealed class HeldFilesTests : IDisposable
 {
     private readonly TempFolder _temp = new();
 
     public void Dispose() => _temp.Dispose();
 
-    private string Record => Path.Combine(_temp.Path, CancelledUploads.FileName);
+    private string Record => Path.Combine(_temp.Path, HeldFiles.FileName);
 
     [Fact]
-    public void A_cancel_survives_a_reload_until_the_file_changes()
+    public void A_hold_survives_a_reload_until_the_file_changes()
     {
         var file = Touch("notes.md");
         var stamp = File.GetLastWriteTimeUtc(file);
-        CancelledUploads.Load(Record).Add(file, stamp);
+        HeldFiles.Load(Record).Add(file, stamp);
 
-        var reloaded = CancelledUploads.Load(Record);
+        var reloaded = HeldFiles.Load(Record);
         Assert.True(reloaded.Holds(file, stamp));
         Assert.True(reloaded.Holds(file.ToUpperInvariant(), stamp), "Windows paths ignore case");
         Assert.False(reloaded.Holds(file, stamp.AddTicks(1)), "a save moves the write time on");
@@ -228,7 +254,7 @@ public sealed class CancelledUploadsTests : IDisposable
     {
         var renamed = Touch("renamed.md");
         var removed = Touch("removed.md");
-        var record = CancelledUploads.Load(Record);
+        var record = HeldFiles.Load(Record);
         record.Add(Path.Combine(_temp.Path, "old name.md"), DateTime.UnixEpoch);
         record.Add(removed, DateTime.UnixEpoch);
         record.Add(Path.Combine(_temp.Path, "gone.md"), DateTime.UnixEpoch);
@@ -237,7 +263,7 @@ public sealed class CancelledUploadsTests : IDisposable
         record.Remove(removed);
         record.Prune();
 
-        var reloaded = CancelledUploads.Load(Record);
+        var reloaded = HeldFiles.Load(Record);
         Assert.True(reloaded.Holds(renamed, DateTime.UnixEpoch));
         Assert.False(reloaded.Holds(removed, DateTime.UnixEpoch));
         Assert.False(reloaded.Holds(Path.Combine(_temp.Path, "gone.md"), DateTime.UnixEpoch));
@@ -249,11 +275,11 @@ public sealed class CancelledUploadsTests : IDisposable
         File.WriteAllText(Record, "{ not json");
         var file = Touch("notes.md");
 
-        var record = CancelledUploads.Load(Record);
+        var record = HeldFiles.Load(Record);
         Assert.False(record.Holds(file, File.GetLastWriteTimeUtc(file)));
 
         record.Add(file, DateTime.UnixEpoch);
-        Assert.True(CancelledUploads.Load(Record).Holds(file, DateTime.UnixEpoch));
+        Assert.True(HeldFiles.Load(Record).Holds(file, DateTime.UnixEpoch));
     }
 
     private string Touch(string name)

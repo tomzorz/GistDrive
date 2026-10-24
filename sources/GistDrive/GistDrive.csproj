@@ -8,8 +8,11 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <!-- One self-contained exe, so the GitHub CLI stays the only prerequisite. Publish only: the
+         test project references this one and cannot reference a self-contained executable. -->
     <PublishSingleFile>true</PublishSingleFile>
-    <SelfContained>false</SelfContained>
+    <PublishSelfContained>true</PublishSelfContained>
+    <EnableCompressionInSingleFile>true</EnableCompressionInSingleFile>
     <RuntimeIdentifier>win-x64</RuntimeIdentifier>
     <ApplicationIcon>icons\gistdrive.ico</ApplicationIcon>
   </PropertyGroup>
