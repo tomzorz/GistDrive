@@ -22,4 +22,4 @@ The first real countdown notification showed a progress bar that never moved, al
 
 ## Caveats and open questions
 
-- Nobody has watched the popup itself move, only the data Windows stores. Action Center draws from that data.
+- A screenshot of the popup on 2026-10-24 showed the bar at the right fill. Windows draws the fill in the accent color, though, so with a gray accent the bar looks still (`docs/SPEC.md`, "Undo window").

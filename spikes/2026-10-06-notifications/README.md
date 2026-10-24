@@ -34,4 +34,4 @@ Can an unpackaged, always-running .NET process show a notification with **Cancel
   dotnet run --project ToastProbe --no-restore -- 60
   ```
 
-- The probe is a console app and GistDrive is a `WinExe`. GistDrive's notifications show up fine as a `WinExe` (its countdown showed on 2026-10-14). A click on **Cancel** in GistDrive itself is not confirmed yet.
+- The probe is a console app and GistDrive is a `WinExe`, which makes no difference: GistDrive's own countdown showed up on 2026-10-14, and a click on its **Cancel** cancelled a public upload on 2026-10-24.

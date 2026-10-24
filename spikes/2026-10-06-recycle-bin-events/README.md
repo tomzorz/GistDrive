@@ -29,4 +29,4 @@ Created spike-notes.md.url
 ## Caveats and open questions
 
 - The watcher alone cannot tell a delete to the Recycle Bin from a permanent delete or a move out of the folder: all of them arrive as Deleted. If GistDrive ever needs to know which, it can look the item up in the bin (`Shell.Application` namespace 10, `System.Recycle.DeletedFrom`).
-- With the deletion setting off, GistDrive recreates the shortcut, so a later restore from the bin finds a file with the same name, and Windows asks whether to replace it. That case is OPEN-31 in the design.
+- With the deletion setting off, GistDrive recreates the shortcut, so a later restore from the bin finds a file with the same name, and Windows asks whether to replace it. `docs/SPEC.md` settles that case in the section "Deleting".
