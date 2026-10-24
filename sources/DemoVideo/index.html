@@ -1,0 +1,969 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>GistDrive demo</title>
+<style>
+  :root {
+    --bg-1: #0b0f14;
+    --bg-2: #141c27;
+    --frame: #1b2029;
+    --tab: #262b35;
+    --command: #1f1f1f;
+    --content: #191919;
+    --line: #2e2e2e;
+    --field: #2f343e;
+    --text: #e6e6e6;
+    --muted: #a0a0a0;
+    --dim: #6e6e6e;
+    --hover: rgb(255 255 255 / 0.07);
+    --selected: rgb(255 255 255 / 0.1);
+    --win-accent: #4cc2ff;
+    --brand: #388bfd;
+    --card: #161b22;
+    --card-line: #30363d;
+    --secret: #8b949e;
+    --public: #2ea043;
+    font-family: "Segoe UI Variable Text", "Segoe UI", system-ui, sans-serif;
+    color: var(--text);
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    background: #05070a;
+    overflow: hidden;
+  }
+
+  /* The stage is always 1280 by 720; preview mode scales it to fit, render mode does not. */
+  #stage {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 1280px;
+    height: 720px;
+    overflow: hidden;
+    transform-origin: 0 0;
+    background: radial-gradient(120% 90% at 30% 20%, var(--bg-2), var(--bg-1));
+  }
+
+  .abs { position: absolute; }
+  svg { display: block; }
+
+  /* File Explorer, after the Windows 11 layout: tabs, address row, command bar, panes, status. */
+  .window {
+    left: 40px;
+    top: 84px;
+    width: 760px;
+    height: 528px;
+    background: var(--content);
+    border: 1px solid #3a3d44;
+    border-radius: 8px;
+    overflow: hidden;
+    box-shadow: 0 24px 60px rgb(0 0 0 / 0.55);
+    font-size: 13px;
+  }
+
+  .tabs {
+    height: 40px;
+    display: flex;
+    align-items: flex-end;
+    padding-left: 8px;
+    background: var(--frame);
+  }
+
+  .tab {
+    width: 210px;
+    height: 34px;
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    padding: 0 10px 0 12px;
+    background: var(--tab);
+    border-radius: 8px 8px 0 0;
+  }
+
+  .tab-icon img, .tab-icon svg { width: 16px; height: 16px; }
+  .tab .close { margin-left: auto; color: var(--muted); }
+  .new-tab { margin: 0 0 8px 12px; color: var(--muted); }
+
+  .caption-buttons {
+    margin-left: auto;
+    align-self: flex-start;
+    display: flex;
+  }
+
+  .caption-buttons span {
+    width: 46px;
+    height: 32px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #cfcfcf;
+  }
+
+  .address-row {
+    height: 48px;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 0 10px;
+    background: var(--tab);
+  }
+
+  .nav-button {
+    width: 32px;
+    height: 32px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #e0e0e0;
+  }
+
+  .nav-button.off { color: #6a6f78; }
+
+  .address {
+    flex: 1;
+    height: 32px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-left: 6px;
+    padding: 0 10px;
+    background: var(--field);
+    border-radius: 4px;
+  }
+
+  .address > img, .address > svg.icon { width: 16px; height: 16px; }
+  .address .chev { color: var(--muted); }
+
+  .search {
+    width: 200px;
+    height: 32px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 10px;
+    background: var(--field);
+    border-radius: 4px;
+    color: #9a9fa8;
+  }
+
+  .command-bar {
+    height: 44px;
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    padding: 0 10px;
+    background: var(--command);
+    border-bottom: 1px solid var(--line);
+    color: #dcdcdc;
+  }
+
+  .command {
+    height: 32px;
+    min-width: 32px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    padding: 0 6px;
+  }
+
+  .command.off { color: #6a6a6a; }
+  .divider { width: 1px; height: 24px; margin: 0 6px; background: #3a3a3a; }
+
+  .nav-pane {
+    left: 0;
+    top: 132px;
+    width: 200px;
+    height: 368px;
+    padding-top: 8px;
+    border-right: 1px solid var(--line);
+  }
+
+  .nav-item {
+    position: absolute;
+    left: 6px;
+    width: 186px;
+    height: 32px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding-left: 14px;
+    font-size: 13.5px;
+  }
+
+  .nav-item.child { padding-left: 34px; }
+  .nav-item img, .nav-item svg.icon { width: 18px; height: 18px; flex: none; }
+  .nav-item .pin { margin-left: auto; margin-right: 10px; color: var(--dim); }
+  .nav-sep { position: absolute; left: 14px; width: 170px; height: 1px; background: var(--line); }
+
+  #nav-sel {
+    left: 6px;
+    top: 0;
+    width: 186px;
+    height: 32px;
+    border-radius: 4px;
+    background: var(--selected);
+  }
+
+  .pane {
+    left: 200px;
+    top: 132px;
+    width: 558px;
+    height: 368px;
+  }
+
+  .cols, .row {
+    position: absolute;
+    left: 6px;
+    width: 546px;
+    display: grid;
+    grid-template-columns: 30px 186px 140px 124px 1fr;
+    align-items: center;
+    padding-left: 10px;
+    white-space: nowrap;
+  }
+
+  .cols { top: 8px; height: 28px; color: var(--muted); font-size: 12.5px; }
+  .cols span:first-child { grid-column: 2; }
+  .row { height: 32px; border-radius: 4px; font-size: 13.5px; }
+  .row .ic { position: relative; width: 20px; height: 20px; }
+  .row .ic > * { position: absolute; inset: 0; width: 20px; height: 20px; }
+  .row .ic svg { width: 20px; height: 20px; }
+  .row .date, .row .type, .row .size { color: var(--muted); }
+  .row .type { position: relative; height: 18px; }
+  .row .type > span { position: absolute; left: 0; top: 0; white-space: nowrap; }
+  .row .size { text-align: right; padding-right: 14px; }
+
+  .view { left: 0; top: 0; width: 558px; height: 368px; }
+
+  .status-bar {
+    left: 0;
+    top: 500px;
+    width: 758px;
+    height: 26px;
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding: 0 16px;
+    color: #c8c8c8;
+    font-size: 12px;
+  }
+
+  .status-bar .views { margin-left: auto; display: flex; gap: 10px; color: #bdbdbd; }
+
+  .panel {
+    left: 832px;
+    top: 84px;
+    width: 408px;
+    height: 528px;
+  }
+
+  .panel-head {
+    height: 48px;
+    display: flex;
+    align-items: baseline;
+    gap: 10px;
+  }
+
+  .panel-head b { font-size: 20px; font-weight: 600; }
+  .panel-head span { color: var(--muted); font-size: 13px; }
+
+  .card {
+    left: 832px;
+    width: 408px;
+    height: 76px;
+    padding: 11px 16px;
+    background: var(--card);
+    border: 1px solid var(--card-line);
+    border-radius: 8px;
+  }
+
+  .card-top { display: flex; align-items: center; gap: 10px; }
+  .card-top b { font-size: 14px; font-weight: 600; }
+  .card .meta { margin-top: 3px; color: var(--muted); font-size: 12px; }
+
+  .badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    height: 20px;
+    padding: 0 8px;
+    border-radius: 10px;
+    font-size: 11px;
+    border: 1px solid;
+  }
+
+  .badge svg { width: 11px; height: 11px; }
+  .badge.secret { color: var(--secret); border-color: #3d444d; }
+  .badge.public { color: var(--public); border-color: #2a5f36; }
+
+  .bars { margin-top: 8px; display: flex; gap: 6px; }
+  .bars i { display: block; height: 6px; border-radius: 3px; background: #262c36; }
+
+  .chip {
+    left: 0;
+    top: 0;
+    height: 36px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 0 12px;
+    background: #2c2c2c;
+    border: 1px solid #454545;
+    border-radius: 6px;
+    font-size: 13.5px;
+    box-shadow: 0 10px 30px rgb(0 0 0 / 0.5);
+  }
+
+  .chip svg { width: 20px; height: 20px; }
+
+  .spark {
+    left: 0;
+    top: 0;
+    border-radius: 50%;
+    background: #79c0ff;
+    box-shadow: 0 0 12px 4px rgb(56 139 253 / 0.7);
+  }
+
+  /* A Windows 11 notification with a progress bar and one button. */
+  .toast {
+    left: 892px;
+    top: 508px;
+    width: 364px;
+    padding: 16px;
+    background: #2c2c2c;
+    border: 1px solid #3f3f3f;
+    border-radius: 8px;
+    box-shadow: 0 16px 40px rgb(0 0 0 / 0.6);
+    font-size: 14px;
+  }
+
+  .toast-app { height: 20px; display: flex; align-items: center; gap: 8px; color: #c8c8c8; font-size: 12px; }
+  .toast-app img { width: 16px; height: 16px; }
+  .toast-app .more { margin-left: auto; }
+  .toast-title { margin-top: 12px; height: 20px; font-weight: 600; }
+  .toast-body { height: 20px; color: #d0d0d0; }
+  .track { margin-top: 12px; height: 4px; border-radius: 2px; background: #474747; overflow: hidden; }
+  .fill { height: 4px; border-radius: 2px; background: var(--win-accent); transform-origin: 0 0; }
+  .status { margin-top: 8px; height: 16px; display: flex; justify-content: space-between; color: #c8c8c8; font-size: 12px; }
+
+  .toast-button {
+    margin-top: 12px;
+    height: 32px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 4px;
+    background: #3b3b3b;
+    border: 1px solid #454545;
+  }
+
+  /* Right-click menus: the Windows 11 one, then the classic one behind Show more options. */
+  .menu {
+    padding: 4px;
+    background: #2c2c2c;
+    border: 1px solid #454545;
+    border-radius: 8px;
+    box-shadow: 0 12px 32px rgb(0 0 0 / 0.55);
+    font-size: 13.5px;
+    transform-origin: 0 0;
+  }
+
+  .menu .item {
+    height: 32px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 0 12px;
+    border-radius: 4px;
+  }
+
+  .menu.classic .item { height: 28px; padding-left: 34px; position: relative; }
+  .menu .item svg, .menu .item img { width: 16px; height: 16px; flex: none; }
+  .menu.classic .item img { position: absolute; left: 10px; }
+  .menu .item em { margin-left: auto; font-style: normal; color: var(--muted); font-size: 12.5px; }
+  .menu hr { margin: 4px 6px; border: 0; border-top: 1px solid #454545; }
+
+  .menu .icons {
+    height: 44px;
+    display: flex;
+    align-items: center;
+    justify-content: space-around;
+    padding: 0 6px;
+    color: #dcdcdc;
+  }
+
+  .ripple {
+    left: 0;
+    top: 0;
+    width: 36px;
+    height: 36px;
+    margin: -18px 0 0 -18px;
+    border-radius: 50%;
+    border: 2px solid rgb(255 255 255 / 0.9);
+  }
+
+  .cursor { left: 0; top: 0; width: 22px; height: 30px; }
+
+  .caption {
+    left: 40px;
+    top: 636px;
+    width: 760px;
+    text-align: center;
+    font-size: 24px;
+    font-weight: 500;
+    text-shadow: 0 2px 12px rgb(0 0 0 / 0.6);
+  }
+
+  .steps {
+    left: 40px;
+    top: 30px;
+    display: flex;
+    gap: 34px;
+    font-size: 20px;
+    font-weight: 500;
+  }
+
+  .steps span { color: #5f6873; }
+
+  .center {
+    left: 0;
+    top: 0;
+    width: 1280px;
+    height: 720px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+  }
+
+  .center img { width: 112px; height: 112px; }
+  .center h1 { margin: 14px 0 0; font-size: 52px; font-weight: 600; letter-spacing: 0.5px; }
+  .center .sub { position: relative; width: 1000px; height: 34px; }
+  .center .sub span { position: absolute; inset: 0; text-align: center; font-size: 24px; color: #b9c3cf; }
+
+  /* Preview only: scrubber under the stage. */
+  .preview-bar {
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 16px;
+    background: rgb(0 0 0 / 0.7);
+    color: #ddd;
+    font: 13px system-ui, sans-serif;
+  }
+
+  .preview-bar input { flex: 1; }
+  .rendering .preview-bar { display: none; }
+</style>
+</head>
+<body>
+<div id="stage">
+  <div id="steps" class="abs steps"><span>1 · Save</span><span>2 · Change your mind</span><span>3 · Send from anywhere</span></div>
+
+  <div id="explorer" class="abs window">
+    <div class="tabs">
+      <div class="tab"><span id="tab-icon" class="tab-icon"></span><span id="tab-title">Secret</span><span class="close" data-icon="close"></span></div>
+      <span class="new-tab" data-icon="plus"></span>
+      <div class="caption-buttons"><span data-icon="minimize"></span><span data-icon="maximize"></span><span data-icon="close"></span></div>
+    </div>
+    <div class="address-row">
+      <span class="nav-button" data-icon="back"></span>
+      <span class="nav-button off" data-icon="forward"></span>
+      <span class="nav-button" data-icon="up"></span>
+      <span class="nav-button" data-icon="refresh"></span>
+      <div id="address" class="address"></div>
+      <div id="search" class="search"></div>
+    </div>
+    <div class="command-bar">
+      <span class="command"><span data-icon="newItem"></span>New<span data-icon="chevronDown"></span></span>
+      <span class="divider"></span>
+      <span class="command off" data-icon="cut"></span>
+      <span class="command off" data-icon="copy"></span>
+      <span class="command off" data-icon="paste"></span>
+      <span class="command off" data-icon="rename"></span>
+      <span class="command off" data-icon="share"></span>
+      <span class="command off" data-icon="trash"></span>
+      <span class="divider"></span>
+      <span class="command"><span data-icon="sort"></span>Sort<span data-icon="chevronDown"></span></span>
+      <span class="command"><span data-icon="view"></span>View<span data-icon="chevronDown"></span></span>
+      <span class="command" data-icon="more"></span>
+      <span class="command" style="margin-left: auto"><span data-icon="details"></span>Details</span>
+    </div>
+    <div id="nav" class="abs nav-pane"><div id="nav-sel" class="abs"></div></div>
+    <div id="pane" class="abs pane"><div class="cols"><span>Name</span><span>Date modified</span><span>Type</span><span style="text-align: right; padding-right: 14px">Size</span></div></div>
+    <div class="abs status-bar"><span id="item-count">3 items</span><span id="item-selected"></span><span class="views"><span data-icon="detailsView"></span><span data-icon="tilesView"></span></span></div>
+  </div>
+
+  <div class="abs panel"><div class="panel-head"><b>Your gists</b><span>gist.github.com</span></div></div>
+  <div id="cards"></div>
+
+  <div id="chip" class="abs chip"></div>
+  <div id="sparks"></div>
+
+  <div id="toast" class="abs toast">
+    <div class="toast-app"><img src="../GistDrive/icons/gistdrive.png" alt=""><span>GistDrive</span><span class="more" data-icon="more"></span><span data-icon="close"></span></div>
+    <div id="toast-title" class="toast-title"></div>
+    <div class="toast-body">As a new public gist.</div>
+    <div class="track"><div id="toast-fill" class="fill"></div></div>
+    <div class="status"><span>Select Cancel to stop</span><span id="toast-seconds"></span></div>
+    <div id="toast-button" class="toast-button">Cancel</div>
+  </div>
+
+  <div id="menu-modern" class="abs menu" style="left: 334px; top: 340px; width: 262px;">
+    <div class="icons"><span data-icon="cut"></span><span data-icon="copy"></span><span data-icon="rename"></span><span data-icon="share"></span><span data-icon="trash"></span></div>
+    <hr>
+    <div class="item"><span data-icon="open"></span>Open<em>Enter</em></div>
+    <div class="item"><span data-icon="openWith"></span>Open with<em>›</em></div>
+    <div class="item"><span data-icon="zip"></span>Compress to ZIP file</div>
+    <div class="item"><span data-icon="copyPath"></span>Copy as path<em>Ctrl+Shift+C</em></div>
+    <div class="item"><span data-icon="properties"></span>Properties<em>Alt+Enter</em></div>
+    <hr>
+    <div id="more-options" class="item"><span data-icon="moreOptions"></span>Show more options</div>
+  </div>
+
+  <div id="menu-classic" class="abs menu classic" style="left: 334px; top: 340px; width: 236px;">
+    <div class="item">Open</div><div class="item">Edit</div><div class="item">Open with<em>›</em></div><hr>
+    <div id="send-to" class="item">Send to<em>›</em></div><hr>
+    <div class="item">Cut</div><div class="item">Copy</div><hr>
+    <div class="item">Delete</div><div class="item">Rename</div><div class="item">Properties</div>
+  </div>
+  <div id="submenu" class="abs menu classic" style="left: 566px; top: 433px; width: 240px;">
+    <div class="item">Compressed (zipped) folder</div><div class="item">Desktop (create shortcut)</div><div class="item">Documents</div>
+    <div id="sub-public" class="item"><img src="../GistDrive/icons/gistdrive.png" alt="">Public gist</div>
+    <div class="item"><img src="../GistDrive/icons/gistdrive.png" alt="">Secret gist</div>
+  </div>
+
+  <div id="ripple" class="abs ripple"></div>
+  <svg id="cursor" class="abs cursor" viewBox="0 0 22 30"><path d="M2 2 L2 24 L8 18.5 L12.5 28 L16 26.5 L11.6 17.2 L19.5 17.2 Z" fill="#fff" stroke="#000" stroke-width="1.6" stroke-linejoin="round"/></svg>
+
+  <div id="caption" class="abs caption"></div>
+
+  <div id="center" class="abs center">
+    <img src="../GistDrive/icons/gistdrive.png" alt="">
+    <h1>GistDrive</h1>
+    <div class="sub"><span id="tagline">Your GitHub gists, right in File Explorer</span><span id="url">github.com/tomzorz/GistDrive</span></div>
+  </div>
+</div>
+
+<div class="preview-bar">
+  <button id="play" type="button">Pause</button>
+  <input id="scrub" type="range" min="0" max="28" step="0.01" value="0">
+  <span id="clock">0.00 s</span>
+</div>
+
+<script>
+  // Every frame is a pure function of time: renderAt(t) sets every animated property from
+  // scratch, so a headless browser can render any frame in any order (see render.mjs).
+  const DURATION = 28;
+
+  const clamp = (x, a = 0, b = 1) => Math.min(b, Math.max(a, x));
+  const seg = (t, a, b) => clamp((t - a) / (b - a));
+  const lerp = (a, b, p) => a + (b - a) * p;
+  const easeInOut = p => (p < 0.5 ? 4 * p * p * p : 1 - (-2 * p + 2) ** 3 / 2);
+  const easeOut = p => 1 - (1 - p) ** 3;
+  const easeOutBack = p => 1 + 2.70158 * (p - 1) ** 3 + 1.70158 * (p - 1) ** 2;
+
+  // Visible from a to b (fading in) until c to d (fading out).
+  const span = (t, a, b, c, d) => Math.min(easeOut(seg(t, a, b)), 1 - easeInOut(seg(t, c, d)));
+
+  // Keyframes [[time, value], ...]; values are numbers or [x, y] pairs.
+  function track(t, keys, ease = easeInOut) {
+    if (t <= keys[0][0]) return keys[0][1];
+    for (let i = 1; i < keys.length; i++) {
+      const [t1, v1] = keys[i];
+      if (t > t1) continue;
+      const [t0, v0] = keys[i - 1];
+      const p = ease(seg(t, t0, t1));
+      return Array.isArray(v0) ? v0.map((v, k) => lerp(v, v1[k], p)) : lerp(v0, v1, p);
+    }
+    return keys[keys.length - 1][1];
+  }
+
+  const $ = id => document.getElementById(id);
+
+  // Line icons in the spirit of Segoe Fluent Icons, drawn on a 20 px grid with a 1.25 px stroke.
+  const line = (d, size = 16) => `<svg viewBox="0 0 20 20" width="${size}" height="${size}" fill="none" stroke="currentColor" stroke-width="1.25" stroke-linecap="round" stroke-linejoin="round">${d}</svg>`;
+  const GLYPHS = {
+    back: line('<path d="M16 10H4M9 5l-5 5 5 5"/>'),
+    forward: line('<path d="M4 10h12M11 5l5 5-5 5"/>'),
+    up: line('<path d="M10 16V4M5 9l5-5 5 5"/>'),
+    refresh: line('<path d="M15.6 7.2A6.2 6.2 0 1 0 16.2 11"/><path d="M16 3.5v4h-4"/>'),
+    chevron: line('<path d="M8 5l5 5-5 5"/>', 12),
+    chevronDown: line('<path d="M5 8l5 5 5-5"/>', 12),
+    search: line('<circle cx="8.5" cy="8.5" r="5"/><path d="M12.2 12.2L17 17"/>'),
+    plus: line('<path d="M10 4v12M4 10h12"/>', 14),
+    close: line('<path d="M5 5l10 10M15 5L5 15"/>', 12),
+    minimize: line('<path d="M5 10h10"/>', 12),
+    maximize: line('<rect x="5" y="5" width="10" height="10" rx="1"/>', 12),
+    newItem: line('<circle cx="10" cy="10" r="7"/><path d="M10 6.5v7M6.5 10h7"/>'),
+    cut: line('<circle cx="6" cy="14.5" r="2.5"/><circle cx="14" cy="14.5" r="2.5"/><path d="M7.5 12.5L14 3M12.5 12.5L6 3"/>'),
+    copy: line('<rect x="7" y="7" width="9.5" height="9.5" rx="1.5"/><path d="M13 7V5a1.5 1.5 0 0 0-1.5-1.5h-6A1.5 1.5 0 0 0 4 5v6a1.5 1.5 0 0 0 1.5 1.5H7"/>'),
+    paste: line('<rect x="4.5" y="4" width="11" height="13" rx="1.5"/><path d="M7.5 4V3h5v1M7.5 9h5M7.5 12h5"/>'),
+    rename: line('<rect x="2.5" y="6" width="12" height="8" rx="1.5"/><path d="M17 4v12M15.5 4h3M15.5 16h3"/>'),
+    share: line('<path d="M10 3v9M6.5 6.5L10 3l3.5 3.5"/><path d="M6 9.5H4.5v7h11v-7H14"/>'),
+    trash: line('<path d="M4 5.5h12M8 5.5V4h4v1.5M5.5 5.5l.8 10.5h7.4l.8-10.5M8.5 8.5v5M11.5 8.5v5"/>'),
+    sort: line('<path d="M6 4v12M3 7l3-3 3 3M14 16V4M11 13l3 3 3-3"/>'),
+    view: line('<path d="M4 5h3M4 10h3M4 15h3M9.5 5H16M9.5 10H16M9.5 15H16"/>'),
+    more: line('<circle cx="5" cy="10" r=".9" fill="currentColor"/><circle cx="10" cy="10" r=".9" fill="currentColor"/><circle cx="15" cy="10" r=".9" fill="currentColor"/>'),
+    details: line('<rect x="3" y="4" width="14" height="12" rx="1.5"/><path d="M12 4v12"/>'),
+    detailsView: line('<path d="M4 5h12M4 10h12M4 15h12"/>', 14),
+    tilesView: line('<rect x="3.5" y="3.5" width="5.5" height="5.5" rx="1"/><rect x="11" y="3.5" width="5.5" height="5.5" rx="1"/><rect x="3.5" y="11" width="5.5" height="5.5" rx="1"/><rect x="11" y="11" width="5.5" height="5.5" rx="1"/>', 14),
+    open: line('<path d="M4.5 16V5.5A1.5 1.5 0 0 1 6 4h5l4.5 4.5V16a1.5 1.5 0 0 1-1.5 1.5H6A1.5 1.5 0 0 1 4.5 16z"/><path d="M11 4v4.5h4.5"/>'),
+    openWith: line('<rect x="3.5" y="3.5" width="5.5" height="5.5" rx="1"/><rect x="11" y="3.5" width="5.5" height="5.5" rx="1"/><rect x="3.5" y="11" width="5.5" height="5.5" rx="1"/><path d="M13.75 11v5.5M11 13.75h5.5"/>'),
+    zip: line('<path d="M5 3.5h10v13H5z"/><path d="M9 3.5v2h2v2H9v2h2v2H9"/>'),
+    copyPath: line('<path d="M7 13l6-6M8.5 6.5L10 5a3 3 0 0 1 4.2 4.2L12.8 10.7M11.5 13.5L10 15a3 3 0 0 1-4.2-4.2l1.4-1.5"/>'),
+    properties: line('<path d="M4 6h12M4 10h12M4 14h7"/>'),
+    moreOptions: line('<rect x="3" y="4" width="14" height="12" rx="1.5"/><path d="M6.5 10h.01M10 10h.01M13.5 10h.01" stroke-width="2"/>'),
+    pin: line('<path d="M12 3l5 5-3 1-3 3 .5 3.5L4.5 8.5 8 9l3-3z"/><path d="M7 13l-3.5 3.5"/>', 13),
+  };
+
+  // Coloured icons after the Windows 11 file and folder icons.
+  const fill = d => `<svg class="icon" viewBox="0 0 20 20" width="18" height="18">${d}</svg>`;
+  const ICONS = {
+    doc: fill('<path d="M5 1.5h7l4 4v13H5z" fill="#f2f2f2"/><path d="M12 1.5v4h4z" fill="#c4c4c4"/><path d="M7.5 10h6M7.5 12.5h6M7.5 15h4" stroke="#9a9a9a" stroke-width="1"/>'),
+    markdown: fill('<path d="M5 1.5h7l4 4v13H5z" fill="#f2f2f2"/><path d="M12 1.5v4h4z" fill="#c4c4c4"/><path d="M7 15V10.5l1.75 2 1.75-2V15M12.5 10.5V15M11.2 13.7l1.3 1.3 1.3-1.3" stroke="#5a6b80" stroke-width="1.1" fill="none" stroke-linecap="round" stroke-linejoin="round"/>'),
+    shortcut: fill('<circle cx="10" cy="9.5" r="7.5" fill="#1f9cf0"/><path d="M2.5 9.5h15M10 2c-2.8 3.5-2.8 11.5 0 15M10 2c2.8 3.5 2.8 11.5 0 15" stroke="#bfe6ff" stroke-width="1" fill="none"/><rect x="1" y="12" width="8" height="7.5" rx="1.2" fill="#fff" stroke="#6a6a6a" stroke-width=".8"/><path d="M3.3 17.4l3.2-3.2M4.3 14.2h2.2v2.2" stroke="#1f6feb" stroke-width="1.2" fill="none" stroke-linecap="round"/>'),
+    folder: fill('<path d="M1.5 4.5a1 1 0 0 1 1-1h5l2 2h8a1 1 0 0 1 1 1v9a1 1 0 0 1-1 1h-15a1 1 0 0 1-1-1z" fill="#e8a325"/><path d="M1.5 7.5h17v8a1 1 0 0 1-1 1h-15a1 1 0 0 1-1-1z" fill="#ffca4a"/>'),
+    home: fill('<path d="M3 9l7-6 7 6v8a1 1 0 0 1-1 1h-4v-5H8v5H4a1 1 0 0 1-1-1z" fill="#f4a03a"/>'),
+    gallery: fill('<rect x="2" y="3.5" width="16" height="13" rx="2" fill="#4aa6ff"/><path d="M2 14l4.5-4.5 3.5 3.5 2.5-2.5L18 16v.5H2z" fill="#1e6fd9"/><circle cx="13" cy="7.5" r="1.6" fill="#d9eeff"/>'),
+    desktop: fill('<rect x="2" y="3" width="16" height="11" rx="1.5" fill="#29b6f6"/><path d="M7 17h6M10 14v3" stroke="#90caf9" stroke-width="1.5"/>'),
+    downloads: fill('<path d="M10 2.5v10M5.5 8.5l4.5 4.5 4.5-4.5" stroke="#3fb950" stroke-width="2" fill="none" stroke-linecap="round" stroke-linejoin="round"/><path d="M3.5 16.5h13" stroke="#3fb950" stroke-width="2" stroke-linecap="round"/>'),
+    documents: fill('<path d="M4.5 1.5h7.5l3.5 3.5v13.5h-11z" fill="#dbe4ef"/><path d="M12 1.5V5h3.5z" fill="#9fb3c8"/><path d="M7 9h6M7 11.5h6M7 14h4" stroke="#6b84a0" stroke-width="1"/>'),
+    pc: fill('<rect x="2" y="3" width="16" height="11" rx="1.5" fill="#3a8ee6"/><rect x="3.5" y="4.5" width="13" height="8" rx=".8" fill="#7cc4ff"/><path d="M7 17h6M10 14v3" stroke="#9aa4b2" stroke-width="1.5"/>'),
+    network: fill('<circle cx="10" cy="10" r="7.5" fill="#2d7fd3"/><path d="M2.5 10h15M10 2.5c-3 3.5-3 11.5 0 15M10 2.5c3 3.5 3 11.5 0 15" stroke="#bcdcff" stroke-width="1" fill="none"/>'),
+    lock: '<svg viewBox="0 0 12 12"><rect x="2" y="5.5" width="8" height="6" rx="1" fill="currentColor"/><path d="M3.8 5.5V4a2.2 2.2 0 0 1 4.4 0v1.5" stroke="currentColor" stroke-width="1.3" fill="none"/></svg>',
+    globe: '<svg viewBox="0 0 12 12"><circle cx="6" cy="6" r="4.8" fill="none" stroke="currentColor" stroke-width="1.2"/><path d="M1.2 6h9.6M6 1.2c-2 3-2 6.6 0 9.6M6 1.2c2 3 2 6.6 0 9.6" stroke="currentColor" stroke-width="1" fill="none"/></svg>',
+  };
+
+  for (const el of document.querySelectorAll('[data-icon]')) el.innerHTML = GLYPHS[el.dataset.icon];
+  const gistdriveIcon = name => `<img src="../GistDrive/icons/${name}.ico" alt="">`;
+
+  // Navigation pane rows, top to bottom.
+  const NAV = [
+    { y: 8, label: 'Home', icon: ICONS.home },
+    { y: 40, label: 'Gallery', icon: ICONS.gallery },
+    { sep: 78 },
+    { y: 86, label: 'Desktop', icon: ICONS.desktop, pin: true },
+    { y: 118, label: 'Downloads', icon: ICONS.downloads, pin: true },
+    { y: 150, label: 'Documents', icon: ICONS.documents, pin: true },
+    { sep: 188 },
+    { y: 196, label: 'This PC', icon: ICONS.pc },
+    { y: 228, label: 'GistDrive', icon: gistdriveIcon('gistdrive') },
+    { y: 260, label: 'Public', icon: gistdriveIcon('public'), child: true },
+    { y: 292, label: 'Secret', icon: gistdriveIcon('secret'), child: true },
+    { y: 324, label: 'Network', icon: ICONS.network },
+  ];
+  for (const item of NAV) {
+    const el = document.createElement('div');
+    if (item.sep) {
+      el.className = 'nav-sep';
+      el.style.top = item.sep + 'px';
+    } else {
+      el.className = 'nav-item' + (item.child ? ' child' : '');
+      el.style.top = item.y + 'px';
+      el.innerHTML = `${item.icon}<span>${item.label}</span>${item.pin ? `<span class="pin">${GLYPHS.pin}</span>` : ''}`;
+    }
+    $('nav').append(el);
+  }
+
+  // The three folders the video visits. A row with `morph` turns from a file into a gist shortcut.
+  const SHORTCUT = 'Internet Shortcut';
+  const VIEWS = {
+    secret: [
+      { name: 'dotfiles.md', date: '14/03/2025 10:22', type: SHORTCUT, size: '1 KB', icon: 'shortcut' },
+      { id: 'notes', name: 'meeting-notes.md', date: 'Today 10:41', type: 'Markdown File', size: '3 KB', icon: 'markdown', morph: true },
+      { name: 'snippets.cs', date: '02/11/2024 18:05', type: SHORTCUT, size: '1 KB', icon: 'shortcut' },
+    ],
+    public: [
+      { id: 'draft', name: 'draft-post.md', date: 'Today 10:43', type: 'Markdown File', size: '5 KB', icon: 'markdown' },
+      { name: 'keyboard-tips.md', date: '21/08/2024 09:12', type: SHORTCUT, size: '1 KB', icon: 'shortcut' },
+      { name: 'release-notes.md', date: '02/06/2025 16:40', type: SHORTCUT, size: '1 KB', icon: 'shortcut' },
+    ],
+    docs: [
+      { name: 'invoices', date: '30/09/2026 08:15', type: 'File folder', size: '', icon: 'folder' },
+      { name: 'notes.txt', date: '19/10/2026 21:03', type: 'Text Document', size: '2 KB', icon: 'doc' },
+      { id: 'snippet', name: 'readme-snippet.md', date: '24/10/2026 17:55', type: 'Markdown File', size: '4 KB', icon: 'markdown' },
+      { name: 'todo.txt', date: '22/10/2026 12:30', type: 'Text Document', size: '1 KB', icon: 'doc' },
+    ],
+  };
+
+  const rows = {};
+  for (const [key, list] of Object.entries(VIEWS)) {
+    const view = document.createElement('div');
+    view.className = 'abs view';
+    view.id = 'view-' + key;
+    for (const row of list) {
+      const el = document.createElement('div');
+      el.className = 'row';
+      const icon = row.morph ? `<span>${ICONS[row.icon]}</span><span>${ICONS.shortcut}</span>` : ICONS[row.icon];
+      const type = row.morph ? `<span>${row.type}</span><span>${SHORTCUT}</span>` : `<span>${row.type}</span>`;
+      el.innerHTML = `<span class="ic">${icon}</span><span>${row.name}</span><span class="date">${row.date}</span><span class="type">${type}</span><span class="size">${row.size}</span>`;
+      view.append(el);
+      if (row.id) rows[row.id] = el;
+      row.el = el;
+    }
+    $('pane').append(view);
+  }
+
+  // Gist cards: the slot a card sits in moves down as new gists arrive on top.
+  const CARD_Y = slot => 140 + slot * 88;
+  const CARDS = [
+    { name: 'dotfiles.md', kind: 'secret', meta: 'Updated 7 months ago', since: -1, bars: [180, 90] },
+    { name: 'release-notes.md', kind: 'public', meta: 'Updated 4 months ago', since: -1, bars: [120, 150] },
+    { name: 'keyboard-tips.md', kind: 'public', meta: 'Updated last year', since: -1, bars: [200, 60] },
+    { name: 'meeting-notes.md', kind: 'secret', meta: 'Updated just now', since: 5.6, bars: [150, 110] },
+    { name: 'readme-snippet.md', kind: 'public', meta: 'Updated just now', since: 24.0, bars: [90, 170] },
+  ];
+  for (const card of CARDS) {
+    const el = document.createElement('div');
+    el.className = 'abs card';
+    const badge = card.kind === 'secret' ? `<span class="badge secret">${ICONS.lock}Secret</span>` : `<span class="badge public">${ICONS.globe}Public</span>`;
+    el.innerHTML = `<div class="card-top"><b>${card.name}</b>${badge}</div><div class="meta">${card.meta}</div><div class="bars">${card.bars.map(w => `<i style="width:${w}px"></i>`).join('')}</div>`;
+    $('cards').append(el);
+    card.el = el;
+  }
+
+  const SPARK_TRAIL = 7;
+  for (let i = 0; i < SPARK_TRAIL; i++) {
+    const dot = document.createElement('div');
+    dot.className = 'abs spark';
+    $('sparks').append(dot);
+  }
+
+  function place(el, { x = 0, y = 0, scale = 1, rotate = 0, opacity = 1 } = {}) {
+    el.style.transform = `translate(${x}px, ${y}px) rotate(${rotate}deg) scale(${scale})`;
+    el.style.opacity = opacity;
+  }
+
+  // Rows sit below the column headers; the pane starts 216 px down the stage, under the
+  // 40 px tabs, the 48 px address row and the 44 px command bar of a window at y 84.
+  const rowTop = slot => 40 + slot * 32;
+  const PANE_TOP = 216;
+
+  // Upload: a short trail of dots on a curve from a file row to the gist panel.
+  function sparks(t, from, to, a, b) {
+    const dots = $('sparks').children;
+    for (let i = 0; i < dots.length; i++) {
+      const p = seg(t, a, b) - i * 0.05;
+      const visible = t > a && t < b + 0.3 && p > 0 && p < 1;
+      const e = easeInOut(clamp(p));
+      const cx = lerp(from[0], to[0], e);
+      const cy = lerp(from[1], to[1], e) - Math.sin(Math.PI * e) * 100;
+      const size = 13 - i * 1.5;
+      dots[i].style.width = dots[i].style.height = size + 'px';
+      place(dots[i], { x: cx - size / 2, y: cy - size / 2, opacity: visible ? 1 - i / SPARK_TRAIL : 0 });
+    }
+  }
+
+  function caption(t) {
+    const lines = [
+      [3.0, 6.0, 'Save a note into Secret.'],
+      [6.2, 9.2, 'It becomes a secret gist, and a shortcut takes its place.'],
+      [9.6, 14.4, 'Saving into Public starts a 30-second countdown.'],
+      [14.6, 17.3, 'Changed your mind? Cancel, and nothing goes up.'],
+      [17.6, 23.4, 'Send to works from any folder.'],
+      [23.6, 25.6, 'The gist goes up. The original stays where it is.'],
+    ];
+    const current = lines.find(([a, b]) => t >= a - 0.25 && t <= b + 0.25);
+    $('caption').textContent = current ? current[2] : '';
+    $('caption').style.opacity = current ? span(t, current[0] - 0.25, current[0] + 0.1, current[1] - 0.1, current[1] + 0.25) : 0;
+  }
+
+  // What the tab, the address bar and the search box show for each folder.
+  const FOLDERS = {
+    Secret: { tab: gistdriveIcon('secret'), lead: gistdriveIcon('gistdrive'), crumbs: ['GistDrive', 'Secret'] },
+    Public: { tab: gistdriveIcon('public'), lead: gistdriveIcon('gistdrive'), crumbs: ['GistDrive', 'Public'] },
+    Documents: { tab: ICONS.documents, lead: ICONS.pc, crumbs: ['This PC', 'Documents'] },
+  };
+  let shownFolder = '';
+
+  function showFolder(name) {
+    if (shownFolder === name) return;
+    shownFolder = name;
+    const folder = FOLDERS[name];
+    $('tab-title').textContent = name;
+    $('tab-icon').innerHTML = folder.tab;
+    $('address').innerHTML = `${folder.lead}${folder.crumbs.map(c => `<span class="chev">${GLYPHS.chevron}</span><span>${c}</span>`).join('')}<span class="chev">${GLYPHS.chevron}</span>`;
+    $('search').innerHTML = `<span>Search ${name}</span>${GLYPHS.search}`;
+  }
+
+  function renderAt(t) {
+    // Intro and outro share the centre: the icon and the name, with the tagline first and the
+    // repository last, so the loop closes on the frame it opens with.
+    const centre = Math.max(1 - easeInOut(seg(t, 1.7, 2.2)), easeOut(seg(t, 26.0, 26.6)));
+    place($('center'), { scale: lerp(0.94, 1, easeOut(seg(t, 0, 0.6))) * lerp(1, 0.96, seg(t, 1.7, 2.2)), opacity: centre });
+    $('tagline').style.opacity = span(t, 0.3, 0.9, 1.6, 2.0);
+    $('url').style.opacity = span(t, 26.4, 27.0, 27.6, 28.0);
+
+    place($('explorer'), { y: lerp(24, 0, easeOut(seg(t, 2.0, 2.8))), scale: lerp(1, 0.98, seg(t, 25.6, 26.2)), opacity: span(t, 2.0, 2.8, 25.6, 26.2) });
+    place(document.querySelector('.panel'), { x: lerp(24, 0, easeOut(seg(t, 2.2, 3.0))), opacity: span(t, 2.2, 3.0, 25.7, 26.3) });
+    place($('steps'), { opacity: span(t, 2.4, 3.0, 25.6, 26.0) });
+    const beat = t < 9.2 ? 0 : t < 17.2 ? 1 : 2;
+    [...$('steps').children].forEach((s, i) => (s.style.color = i === beat ? '#fff' : ''));
+
+    // Which folder the window shows, and where the navigation pane's selection sits.
+    showFolder(t < 9.5 ? 'Secret' : t < 17.5 ? 'Public' : 'Documents');
+    const navY = label => NAV.find(item => item.label === label).y;
+    place($('nav-sel'), { y: track(t, [[9.2, navY('Secret')], [9.6, navY('Public')], [17.2, navY('Public')], [17.6, navY('Documents')]]) });
+    place($('view-secret'), { opacity: 1 - seg(t, 9.2, 9.6) });
+    place($('view-public'), { opacity: Math.min(seg(t, 9.4, 9.8), 1 - seg(t, 17.2, 17.6)) });
+    place($('view-docs'), { opacity: seg(t, 17.4, 17.8) });
+
+    // Beat 1: meeting-notes.md drops into Secret, uploads, and turns into its shortcut.
+    const [dot, notes, snippets] = VIEWS.secret.map(r => r.el);
+    place(dot, { y: rowTop(0) });
+    place(notes, { y: rowTop(1), opacity: seg(t, 3.95, 4.05) });
+    place(snippets, { y: rowTop(track(t, [[3.55, 1], [3.9, 2]])) });
+    const morph = easeInOut(seg(t, 6.2, 6.8));
+    notes.querySelector('.ic').children[0].style.opacity = 1 - morph;
+    notes.querySelector('.ic').children[1].style.opacity = morph;
+    notes.querySelector('.type').children[0].style.opacity = 1 - morph;
+    notes.querySelector('.type').children[1].style.opacity = morph;
+    notes.querySelector('.size').textContent = morph > 0.5 ? '1 KB' : '3 KB';
+    notes.style.background = `rgb(56 139 253 / ${0.28 * span(t, 6.2, 6.5, 7.2, 8.0)})`;
+
+    // Beat 2: draft-post.md drops into Public; the countdown starts and Cancel stops it.
+    const [draft, tips, release] = VIEWS.public.map(r => r.el);
+    place(draft, { y: rowTop(0), opacity: seg(t, 10.75, 10.85) });
+    place(tips, { y: rowTop(track(t, [[10.35, 0], [10.7, 1]])) });
+    place(release, { y: rowTop(track(t, [[10.35, 1], [10.7, 2]])) });
+    $('item-count').textContent = shownFolder === 'Secret' ? (t < 4 ? '2 items' : '3 items') : shownFolder === 'Public' ? (t < 10.8 ? '2 items' : '3 items') : '4 items';
+
+    // Beat 3: Send to from Documents; the original row stays put.
+    VIEWS.docs.forEach((r, i) => place(r.el, { y: rowTop(i) }));
+    const selected = t > 19.15 && t < 21.6;
+    const stays = span(t, 24.4, 24.7, 25.0, 25.5) * 0.28;
+    rows.snippet.style.background = stays > 0 ? `rgb(56 139 253 / ${stays})` : selected ? 'var(--selected)' : '';
+    $('item-selected').textContent = selected ? '1 item selected  4 KB' : '';
+
+    // The file that lands in a folder: a chip that drops into its row.
+    const drops = [
+      { a: 3.2, b: 4.0, name: 'meeting-notes.md', to: [244, PANE_TOP + rowTop(1)] },
+      { a: 10.0, b: 10.8, name: 'draft-post.md', to: [244, PANE_TOP + rowTop(0)] },
+    ];
+    const drop = drops.find(d => t >= d.a && t <= d.b + 0.15);
+    if (drop) {
+      $('chip').innerHTML = `${ICONS.markdown}<span>${drop.name}</span>`;
+      const p = easeOut(seg(t, drop.a, drop.b));
+      place($('chip'), {
+        x: lerp(drop.to[0] + 40, drop.to[0], p),
+        y: lerp(drop.to[1] - 200, drop.to[1] - 2, p),
+        rotate: lerp(-8, 0, p),
+        scale: lerp(1.15, 1, p),
+        opacity: Math.min(seg(t, drop.a, drop.a + 0.15), 1 - seg(t, drop.b, drop.b + 0.15)),
+      });
+    } else {
+      place($('chip'), { opacity: 0 });
+    }
+
+    // Uploads fly to the top card slot.
+    if (t < 15) sparks(t, [560, PANE_TOP + rowTop(1) + 16], [920, CARD_Y(0) + 30], 4.4, 5.6);
+    else sparks(t, [580, PANE_TOP + rowTop(2) + 16], [920, CARD_Y(0) + 30], 23.5, 24.1);
+
+    // Gist cards: each new one slides in on top and pushes the others down.
+    const arrivals = CARDS.filter(c => c.since > 0).map(c => c.since);
+    const pushed = since => arrivals.filter(a => a > since).reduce((sum, a) => sum + easeInOut(seg(t, a, a + 0.4)), 0);
+    CARDS.forEach((card, i) => {
+      const slot = (card.since < 0 ? i : 0) + pushed(card.since);
+      const enter = card.since < 0 ? 1 : easeOutBack(seg(t, card.since, card.since + 0.5));
+      const glow = card.since < 0 ? 0 : span(t, card.since, card.since + 0.3, card.since + 1.2, card.since + 2.2);
+      card.el.style.top = CARD_Y(slot) + 'px';
+      card.el.style.boxShadow = `0 0 0 ${2 * glow}px rgb(56 139 253 / ${glow}), 0 0 ${24 * glow}px rgb(56 139 253 / ${0.5 * glow})`;
+      const visible = card.since < 0 ? span(t, 2.2, 3.0, 25.7, 26.3) : Math.min(seg(t, card.since, card.since + 0.25), 1 - seg(t, 25.7, 26.3));
+      place(card.el, { x: lerp(30, 0, clamp(enter, 0, 1.2)), opacity: visible });
+    });
+
+    // The notification: a cancelled countdown in beat 2, a finished one in beat 3.
+    const second = t > 17;
+    const toastIn = second ? span(t, 21.7, 22.1, 23.3, 23.7) : span(t, 11.0, 11.4, 14.5, 14.9);
+    const remaining = second ? 30 * (1 - seg(t, 22.1, 23.3)) : 30 - 8 * seg(t, 11.4, 14.4);
+    $('toast-title').textContent = second ? 'Publishing readme-snippet.md' : 'Publishing draft-post.md';
+    $('toast-fill').style.transform = `scaleX(${remaining / 30})`;
+    $('toast-seconds').textContent = `${Math.ceil(remaining)} s`;
+    $('toast-button').style.background = !second && t > 14.35 && t < 14.55 ? '#555' : !second && t > 14.1 && t < 14.6 ? '#454545' : '';
+    place($('toast'), { y: lerp(40, 0, easeOut(toastIn)), opacity: toastIn });
+
+    // Right-click: the Windows 11 menu, Show more options, then the classic menu and Send to.
+    const modern = span(t, 19.2, 19.3, 20.0, 20.1);
+    place($('menu-modern'), { scale: lerp(0.96, 1, modern), opacity: modern });
+    $('more-options').style.background = t > 19.85 && t < 20.1 ? 'var(--hover)' : '';
+    const classic = span(t, 20.15, 20.25, 21.5, 21.6);
+    place($('menu-classic'), { scale: lerp(0.96, 1, classic), opacity: classic });
+    place($('submenu'), { scale: lerp(0.96, 1, span(t, 20.8, 20.9, 21.5, 21.6)), opacity: span(t, 20.8, 20.9, 21.5, 21.6) });
+    $('send-to').style.background = t > 20.7 && t < 21.6 ? 'var(--hover)' : '';
+    $('sub-public').style.background = t > 21.3 && t < 21.6 ? 'var(--hover)' : '';
+
+    // The pointer, and a ring for each click.
+    const pointer = t < 17
+      ? track(t, [[12.8, [760, 700]], [14.1, [1074, 664]], [14.6, [1074, 664]], [15.4, [1010, 700]]])
+      : track(t, [[18.0, [700, 690]], [19.0, [330, 336]], [19.3, [330, 336]], [19.9, [420, 582]], [20.15, [420, 582]], [20.75, [420, 451]], [20.85, [420, 451]], [21.0, [560, 451]], [21.35, [650, 535]], [21.6, [650, 535]], [22.0, [690, 580]]]);
+    const pointerVisible = t < 17 ? span(t, 12.8, 13.1, 15.0, 15.4) : span(t, 18.0, 18.3, 21.7, 22.0);
+    place($('cursor'), { x: pointer[0], y: pointer[1], opacity: pointerVisible });
+    const click = [[14.35, [1074, 664]], [19.15, [330, 336]], [20.0, [420, 582]], [21.45, [650, 535]]].find(([at]) => t >= at && t < at + 0.4);
+    if (click) {
+      const p = seg(t, click[0], click[0] + 0.4);
+      place($('ripple'), { x: click[1][0], y: click[1][1], scale: lerp(0.3, 1.3, easeOut(p)), opacity: 1 - p });
+    } else {
+      place($('ripple'), { opacity: 0 });
+    }
+
+    caption(t);
+  }
+
+  window.renderAt = renderAt;
+  window.DURATION = DURATION;
+
+  if (new URLSearchParams(location.search).has('render')) {
+    document.body.classList.add('rendering');
+    renderAt(0);
+  } else {
+    // Preview: play in real time, loop, and scrub with the slider.
+    const stage = $('stage');
+    const fit = () => {
+      const scale = Math.min(innerWidth / 1280, (innerHeight - 52) / 720);
+      stage.style.scale = scale;
+      stage.style.left = `${(innerWidth - 1280 * scale) / 2}px`;
+    };
+    addEventListener('resize', fit);
+    fit();
+
+    let playing = true;
+    let offset = 0;
+    let started = performance.now();
+    const scrub = $('scrub');
+    $('play').addEventListener('click', () => {
+      offset = Number(scrub.value);
+      started = performance.now();
+      playing = !playing;
+      $('play').textContent = playing ? 'Pause' : 'Play';
+    });
+    scrub.addEventListener('input', () => {
+      offset = Number(scrub.value);
+      started = performance.now();
+      renderAt(offset);
+    });
+    const frame = now => {
+      if (playing) {
+        const t = (offset + (now - started) / 1000) % DURATION;
+        scrub.value = t;
+        $('clock').textContent = `${t.toFixed(2)} s`;
+        renderAt(t);
+      }
+      requestAnimationFrame(frame);
+    };
+    requestAnimationFrame(frame);
+  }
+</script>
+</body>
+</html>

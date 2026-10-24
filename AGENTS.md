@@ -18,3 +18,4 @@ GistDrive puts a GitHub account's gists in File Explorer: a sidebar entry over t
 - The opt-in suites reach real things: `GISTDRIVE_REAL_NOTIFIER=1` shows Windows notifications, `GISTDRIVE_LIVE_READONLY=1` reads the signed-in account's gists, and `GISTDRIVE_LIVE_GITHUB=1` creates and deletes secret gists in that account. Run the last one only with the account owner's yes.
 - There is no CI. Releases are built by hand with the procedure in `docs/SPEC.md`, section "Release".
 - `sources/IconMaker` draws the icons; never edit the `.ico` files by hand.
+- `sources/DemoVideo` renders `docs/demo.gif` and the 1080p MP4; change the page and run `node render.mjs` again rather than editing the GIF. The MP4 stays out of the repo.

@@ -1,5 +1,7 @@
 # GistDrive
 
+![A note saved into Secret becomes a secret gist and a shortcut; a save into Public waits 30 seconds and gets cancelled; Send to uploads a file from Documents as a public gist and leaves the original in place.](docs/demo.gif)
+
 GistDrive puts your GitHub gists in File Explorer. A sidebar entry opens two real folders, `Secret` and `Public`, with a `.url` shortcut for every gist file. Save a text file into one of them and it becomes a gist, then turns into its shortcut. Save a file with the same name next to a shortcut and the gist gets updated. Right-click a shortcut for **Edit**, **Delete gist** and **Make public**, and use **Send to** to upload a copy of a file from anywhere. The GitHub CLI does the talking to GitHub, so GistDrive stores no token of its own.
 
 ## Requirements
@@ -74,6 +76,7 @@ The layout follows [archetype](https://github.com/tomzorz/archetype):
 - `sources/GistDrive`: the app, a .NET 10 WinExe with no package references
 - `sources/GistDrive.Tests`: xunit.v3 tests
 - `sources/IconMaker`: the WPF program that draws `sources/GistDrive/icons`. Change the drawing there and run `dotnet run --project sources/IconMaker -- sources/GistDrive/icons` rather than editing the `.ico` files.
+- `sources/DemoVideo`: the animation at the top of this README, an HTML page that plays in any browser (serve `sources/` so it finds the icons). `node render.mjs` renders it frame by frame at 1080p through headless Edge, and ffmpeg encodes a 1080p MP4 and `docs/demo.gif` from those frames. It needs Node 22, Edge and ffmpeg, and nothing from npm.
 - `docs/SPEC.md`: the specification
 - `spikes`: the experiments that settled how the Windows side works, each with its findings
 
