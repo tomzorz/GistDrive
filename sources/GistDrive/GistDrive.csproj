@@ -1,0 +1,27 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <!-- WinExe: started from the Startup folder and from Explorer menus, a console flash would be ugly. -->
+    <OutputType>WinExe</OutputType>
+    <!-- The 19041 Windows SDK projection brings the WinRT notification APIs without a package. -->
+    <TargetFramework>net10.0-windows10.0.19041.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <PublishSingleFile>true</PublishSingleFile>
+    <SelfContained>false</SelfContained>
+    <RuntimeIdentifier>win-x64</RuntimeIdentifier>
+    <ApplicationIcon>icons\gistdrive.ico</ApplicationIcon>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <!-- The folder icons and the notification image ship next to the exe; IconMaker draws them. -->
+    <None Remove="icons\**" />
+    <Content Include="icons\gistdrive.ico;icons\secret.ico;icons\public.ico;icons\gistdrive.png" CopyToOutputDirectory="PreserveNewest" CopyToPublishDirectory="PreserveNewest" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="GistDrive.Tests" />
+  </ItemGroup>
+
+</Project>
