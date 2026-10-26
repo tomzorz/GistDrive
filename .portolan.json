@@ -1,0 +1,4 @@
+{
+  "$schema": "https://raw.githubusercontent.com/tomzorz/portolan/main/docs/project.schema.json",
+  "description": "A File Explorer sidebar entry for Windows whose Public and Secret folders mirror your GitHub gists: a text file saved there becomes a gist and turns into its shortcut."
+}
